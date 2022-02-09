@@ -2,7 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as dat from 'lil-gui';
-import CANNON from 'cannon';
+import * as CANNON from 'cannon-es';
 
 /**
  * Debug
@@ -11,9 +11,7 @@ const gui = new dat.GUI();
 const debugObject = {};
 
 debugObject.createSphere = () => {
-  createSphere(
-    Math.random() * 0.5, 
-    {
+  createSphere(Math.random() * 0.5, {
     x: (Math.random() - 0.5) * 3,
     y: 3,
     z: (Math.random() - 0.5) * 3,
@@ -22,17 +20,26 @@ debugObject.createSphere = () => {
 gui.add(debugObject, 'createSphere');
 // box
 debugObject.createBox = () => {
-  createBox(
-    Math.random(), 
-    Math.random(), 
-    Math.random(), 
-    {
+  createBox(Math.random(), Math.random(), Math.random(), {
     x: (Math.random() - 0.5) * 3,
     y: 3,
     z: (Math.random() - 0.5) * 3,
   });
 };
 gui.add(debugObject, 'createBox');
+debugObject.reset = () => {
+  for(const object of objectsToUpdate){
+    // cannon
+    world.removeBody(object.body)
+    object.body.removeEventListener('collide', playHitSound)
+
+    //scene three
+    scene.remove(object.mesh)
+
+  }
+  objectsToUpdate.splice(0, objectsToUpdate.length);
+}
+gui.add(debugObject, 'reset')
 /**
  * Base
  */
@@ -42,6 +49,17 @@ const canvas = document.querySelector('canvas.webgl');
 // Scene
 const scene = new THREE.Scene();
 
+//**SOUND */
+const hitSound = new Audio('/sounds/hit.mp3');
+
+const playHitSound = (collision) => {
+  const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+  if (impactStrength > 1.5) {
+    hitSound.volume = Math.random();
+    hitSound.currentTime = 0;
+    hitSound.play();
+  }
+};
 /**
  * Textures
  */
@@ -61,8 +79,8 @@ const environmentMapTexture = cubeTextureLoader.load([
  */
 // world
 const world = new CANNON.World();
-world.broadphase = new CANNON.SAPBroadphase(world)
-world.allowSleep = true
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.allowSleep = true;
 world.gravity.set(0, -9.82, 0);
 
 // material
@@ -204,7 +222,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
  */
 //sphere
 const objectsToUpdate = [];
-const sphereGeometry = new THREE.SphereBufferGeometry(1, 20, 20)
+const sphereGeometry = new THREE.SphereBufferGeometry(1, 20, 20);
 const sphereMaterial = new THREE.MeshStandardMaterial({
   metalness: 0.3,
   roughness: 0.4,
@@ -212,7 +230,7 @@ const sphereMaterial = new THREE.MeshStandardMaterial({
 });
 const createSphere = (radius, position) => {
   const mesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
-  mesh.scale.set(radius, radius, radius)
+  mesh.scale.set(radius, radius, radius);
   mesh.castShadow = true;
   mesh.position.copy(position);
   scene.add(mesh);
@@ -226,6 +244,7 @@ const createSphere = (radius, position) => {
     material: defaultMaterial,
   });
   body.position.copy(position);
+  body.addEventListener('collide', playHitSound);
   world.addBody(body);
 
   // objects to save
@@ -261,6 +280,7 @@ const createBox = (width, height, depth, position) => {
     material: defaultMaterial,
   });
   body.position.copy(position);
+  body.addEventListener('collide', playHitSound);
   world.addBody(body);
 
   // objects to save
@@ -269,7 +289,6 @@ const createBox = (width, height, depth, position) => {
     body,
   });
 };
-
 
 /**
  * Animate
